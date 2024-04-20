@@ -4,27 +4,33 @@ using Nodegrpcservice;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using static System.Net.WebRequestMethods;
 
 namespace NodeProject
 {
     public class Node
     {
-        public int Id { get; private set; }
-        public string Name { get; private set; }
-        public string Role { get; private set; }
+        // -1 indicates no leader has been elected
+        public static int LeaderNodeId = -1; 
+        public int Id { get;  set; }
+        public string Name { get;  set; }
+        public string Role { get;  set; }
 
-        public bool IsLeader { get; set; }
+        public bool IsLeader { get;  set; }
         public bool IsNodeStarted { get; set; }
-        public List<NodeTable> NodeTable { get; private set; }
-        public List<ValueTable> ValueTable { get; private set; }
+        public List<NodeTable> NodeTable { get; set; }
+        public List<ValueTable> ValueTable { get;  set; }
 
+        private const string IP = "http://localhost:";
         private const int Port = 50051;
 
         Server _server;
         NodeDiscoveryService discovery;
+        NodeGrpcService nodeGrpcService;
 
         private Dictionary<int, (Channel channel, NodeService.NodeServiceClient client)> _clientConnections = new Dictionary<int, (Channel channel, NodeService.NodeServiceClient client)>();
 
@@ -42,9 +48,11 @@ namespace NodeProject
             //DetermineRole();
             // Task.Run(() => DetermineRole());
 
-            var registredNode = discovery.RegisterNodeAsync("localhost", Port);
+            var registredNode = discovery.RegisterNodeAsync(IP, Port);
             this.Id = (int)registredNode?.Result?.Id;
             var nodePort = Port + this.Id;
+
+            this.Name = "Node-0" + Id;
 
             _server = new Server
             {
@@ -52,10 +60,6 @@ namespace NodeProject
                 Ports = { new ServerPort("localhost", nodePort, ServerCredentials.Insecure) }
             };
             _server.Start();
-
-            // Role assignment logic goes here
-            // For example, use NodeCount to determine the role
-            Role = (this.Id % 2 == 0) ? "Hasher" : "Receiver";
              
             var nodes = discovery.DiscoverNodesAsync();
             var anodes = nodes.Result.ToList();
@@ -63,8 +67,11 @@ namespace NodeProject
             var broadCastResponse = new NodeInfoResponse();
             foreach (var node in anodes)
             {
-              var task =  BroadcastNode("http://localhost:" + node.Port, node.Id,this.Id);
-              broadCastResponse = task.Result; 
+              var np = Port + node.Id;
+              var task =  BroadcastNode(IP + np, node.Id,this.Id);
+
+                if (task.Result.Nodes.Count > 0)
+                    broadCastResponse.Nodes.Add(task.Result.Nodes.FirstOrDefault());
             }
 
             foreach (var item in broadCastResponse.Nodes)
@@ -78,8 +85,8 @@ namespace NodeProject
                 });
             }
 
-            
-            
+            this.ElectLeader();
+
             Console.WriteLine($"Node {Id} started with gRPC server listening on port {nodePort}.");
             // Keep the server running until the user presses a key
             Console.WriteLine("Press any key to stop the node...");
@@ -103,26 +110,83 @@ namespace NodeProject
             Console.WriteLine($"Node {Id} has been stopped.");
         }
 
-        private void DetermineRole()
+        public async void ElectLeader()
         {
-            // Here we assume that we have some way of discovering other nodes in the network,
-            // for example through a discovery service or a predefined list of nodes.
-            //var peerNodes = await DiscoverPeerNodesAsync();
+            //lowest ID as the leader
+            int? electedLeaderId = NodeTable.Min(node => (int?)node.NodeId);
 
-            // Broadcast message to all connected peers and wait for their replies
-            //var peersInfo = await BroadcastAndGetPeersInfoAsync(peerNodes);
+            if (electedLeaderId.HasValue)
+            {
+                LeaderNodeId = electedLeaderId.Value;
+                IsLeader = LeaderNodeId == this.Id;
 
-            // Update node table with received info
-            //foreach (var peerInfo in peersInfo)
-            //{
-            //    NodeTable[peerInfo.Id] = peerInfo.Name;
-            //}
+                // If this node is the leader, assign roles to all nodes including itself
+                if (IsLeader)
+                {
+                    await BroadcastLeaderElectionResult(IP,Port);
+                    await AssignAndBroadcastRoles(); // This will handle role assignment
+                }
+            }
 
-            // Determine role based on the number of nodes including this node
-            //int totalNodes = NodeTable.Count + 1; // Include this node
-            //Role = (totalNodes % 2 == 0) ? "Hasher" : "Receiver";
+        }
 
-            //Console.WriteLine($"Node {Id} has determined its role as {Role}.");
+        public async Task UpdateNodeRole(string targetAddress,int nodeId, string role)
+        {
+            try
+            {
+               var channel = GrpcChannel.ForAddress(targetAddress);
+               var client = new NodeService.NodeServiceClient(channel);
+
+               var response = await client.SetRoleAsync(new SetRoleRequest { NodeId = nodeId, Role = role });
+               Console.WriteLine($"Node Id : {nodeId} Brodcasted successfully: {response.Success}");
+
+               if (response.Success)
+               {
+                   var node = NodeTable.FirstOrDefault(node => node.NodeId == nodeId);
+                   if (node != null)
+                   {
+                      node.Role = role;
+                   }
+                   Console.WriteLine($"Role {role} set successfully on Node {nodeId}.");
+               }
+               else
+               {
+                   Console.WriteLine($"Failed to set role on Node {nodeId}.");
+               }
+
+            }
+            catch (Exception exc)
+            {
+                throw exc;
+            }
+        }
+        public async Task AssignAndBroadcastRoles()
+        {
+            // Determine and assign roles based on the count of nodes
+            int nodeCount = NodeTable.Count + 1; // +1 to include this node itself
+            string newRole;
+
+            // Determine the new role for the joining node
+            if (nodeCount % 2 == 0)
+            {
+                newRole = "Hasher";
+            }
+            else
+            {
+                newRole = "Receiver";
+            }
+
+            var nodePort = Port + this.Id;
+            // Assign the new role to the joining node
+            await UpdateNodeRole(IP+nodePort,this.Id, newRole);
+
+            // Broadcast the new role assignments to all nodes
+            foreach (var node in NodeTable)
+            {
+                var nPort = Port + node.NodeId;
+                string role = (node.NodeId % 2 == 0) ? "Hasher" : "Receiver";
+                await UpdateNodeRole(IP+nPort,node.NodeId, role);
+            }
         }
 
         public static async Task<NodeInfoResponse> BroadcastNode(string targetAddress, int nodeId,int currentNodeId)
@@ -147,7 +211,38 @@ namespace NodeProject
             return response;
         }
 
-        public static async Task<HeartbeatResponse> SendHeartbeat(string address,int nodeId, string nodeName)
+    public async Task BroadcastLeaderElectionResult(string address,int port)
+    {
+        // Logic for broadcasting the election result to all nodes goes here
+        var leaderInfo = new LeaderInfo { LeaderNodeId = LeaderNodeId, LeaderNodeName = this.Name };
+
+        foreach (var node in NodeTable)
+        {
+            if (node.NodeId != this.Id) // Don't broadcast to self
+            {
+                try
+                {
+                        var nodePort = port + node.NodeId;
+                        var channel = GrpcChannel.ForAddress(address+nodePort);
+                        var client = new NodeService.NodeServiceClient(channel);
+                        var response = await client.BroadcastLeaderInfoAsync(leaderInfo); 
+
+                        if (response != null && response.Success)
+                        {
+                            // Update the leader node information based on the broadcast
+                             //LeaderNodeId = request.LeaderNodeId;
+                            //_node.IsLeader = (Node.LeaderNodeId == _node.Id);
+                        }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error broadcasting leader to Node {node.NodeId}: {ex.Message}");
+                }
+            }
+        }
+    }
+
+    public static async Task<HeartbeatResponse> SendHeartbeat(string address,int nodeId, string nodeName)
         {
             HeartbeatResponse response = new HeartbeatResponse();
             try
@@ -174,7 +269,7 @@ namespace NodeProject
                 {
                     foreach (var item in NodeTable)
                     {
-                        var response = SendHeartbeat("http://localhost:" + item.Port, item.NodeId, item.Name);
+                        var response = SendHeartbeat(IP + item.Port, item.NodeId, item.Name);
 
                         if (!response.Result.Success)
                         {

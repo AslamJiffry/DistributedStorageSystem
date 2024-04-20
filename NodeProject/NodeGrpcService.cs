@@ -1,5 +1,6 @@
 ﻿using Grpc.Core;
 using Nodegrpcservice;
+using System.Xml.Linq;
 
 
 namespace NodeProject
@@ -8,7 +9,7 @@ namespace NodeProject
     {
        public static readonly Dictionary<int, NodeDetails> _nodes = new Dictionary<int, NodeDetails>();
 
-       
+        
         public async override Task<NodeInfoResponse> BroadcastNodeInfo(NodeInfo request, ServerCallContext context)
         {
             // Store or update the node info.
@@ -73,6 +74,22 @@ namespace NodeProject
                     _nodes.Remove(nodeId);
                 }
             }
+        }
+
+        public override Task<LeaderInfoResponse> BroadcastLeaderInfo(LeaderInfo request, ServerCallContext context)
+        {
+            return Task.FromResult(new LeaderInfoResponse { Success = true });
+        }
+
+        public override Task<SetRoleResponse> SetRole(SetRoleRequest request, ServerCallContext context)
+        {
+            var response = new SetRoleResponse { Success = true };
+            _nodes[request.NodeId] = new NodeDetails
+            {
+                Role = request.Role,
+            };
+
+            return Task.FromResult(response);
         }
 
     }
