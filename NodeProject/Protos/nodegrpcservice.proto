@@ -1,0 +1,48 @@
+﻿syntax = "proto3";
+
+package nodegrpcservice;
+
+service NodeService {
+  rpc BroadcastNodeInfo(NodeInfo) returns (NodeInfoResponse);
+  rpc SendValueToReceiver(ValueToReceiverRequest) returns (ValueToReceiverResponse);
+  rpc RetrieveData(DataRequest) returns (DataResponse);
+  rpc SendHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}
+
+message NodeInfo {
+  string node_name = 1;
+  int32 node_id = 2;
+}
+
+message NodeInfoResponse {
+  // Acknowledgement or a list of current nodes' info
+  repeated NodeInfo nodes = 1;
+}
+
+message ValueToReceiverRequest {
+  string hash_key = 1;
+  string full_string = 2;
+}
+
+message ValueToReceiverResponse {
+  bool success = 1;
+}
+
+message DataRequest {
+  string hash_key = 1;
+}
+
+message DataResponse {
+  string full_string = 1;
+  bool success = 2;
+}
+
+// Define the request and response for the SendHeartbeat method
+message HeartbeatRequest {
+  string node_name = 1;
+  int32 node_id = 2;
+}
+
+message HeartbeatResponse {
+  bool success = 1;
+}

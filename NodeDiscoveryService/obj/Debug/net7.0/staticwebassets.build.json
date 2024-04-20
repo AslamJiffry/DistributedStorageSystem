@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "qf8gArPXUgiIWmOKhxEZdNfQl9oSYxIGlw/a6uXdKS8=",
+  "Source": "NodeDiscoveryService",
+  "BasePath": "_content/NodeDiscoveryService",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
