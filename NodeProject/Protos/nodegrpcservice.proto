@@ -7,8 +7,6 @@ service NodeService {
   rpc SendValueToReceiver(ValueToReceiverRequest) returns (ValueToReceiverResponse);
   rpc RetrieveData(DataRequest) returns (DataResponse);
   rpc SendHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
-  rpc BroadcastLeaderInfo(LeaderInfo) returns (LeaderInfoResponse);
-  rpc SetRole(SetRoleRequest) returns (SetRoleResponse);
 }
 
 message NodeInfo {
@@ -46,27 +44,5 @@ message HeartbeatRequest {
 }
 
 message HeartbeatResponse {
-  bool success = 1;
-}
-
-// Message to broadcast leader information to all nodes.
-message LeaderInfo {
-  int32 leader_node_id = 1;
-  string leader_node_name = 2;
-}
-
-// Response message for a successful leader info broadcast.
-message LeaderInfoResponse {
-  bool success = 1;
-}
-
-// Request message to set a node's role.
-message SetRoleRequest {
-  int32 node_id = 1;
-  string role = 2;
-}
-
-// Response message for setting a node's role.
-message SetRoleResponse {
   bool success = 1;
 }

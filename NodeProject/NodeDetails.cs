@@ -10,8 +10,6 @@ namespace NodeProject
     public class NodeDetails
     {
             public NodeInfo NodeInfo { get; set; }
-            public int Port { get; set; }
-            public string Role { get; set; }
             public DateTime LastHeartbeat { get; set; }
       
     }
