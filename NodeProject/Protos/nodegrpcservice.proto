@@ -1,5 +1,5 @@
 ﻿syntax = "proto3";
-
+import "google/protobuf/empty.proto";  // Importing the definition of Empty
 package nodegrpcservice;
 
 service NodeService {
@@ -7,11 +7,14 @@ service NodeService {
   rpc SendValueToReceiver(ValueToReceiverRequest) returns (ValueToReceiverResponse);
   rpc RetrieveData(DataRequest) returns (DataResponse);
   rpc SendHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc BroadcastLeaderAndRoleInfo(LeaderAndRoleInfo) returns (BroadcastResponse);
+  rpc GetLeaderAndRoleInfo(google.protobuf.Empty) returns (LeaderAndRoleInfoResponse);
 }
 
 message NodeInfo {
   string node_name = 1;
   int32 node_id = 2;
+  string role = 3;
 }
 
 message NodeInfoResponse {
@@ -46,3 +49,19 @@ message HeartbeatRequest {
 message HeartbeatResponse {
   bool success = 1;
 }
+
+message LeaderAndRoleInfoResponse {
+  int32 leader_node_id = 1;
+  repeated NodeInfo nodes = 2; // NodeInfo includes the node ID and role
+}
+
+message LeaderAndRoleInfo {
+  int32 leader_node_id = 1;
+  repeated NodeInfo nodes = 2; // NodeInfo should include node ID and role
+}
+
+message BroadcastResponse {
+  bool success = 1;
+  string message = 2;
+}
+

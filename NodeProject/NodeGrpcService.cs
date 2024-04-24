@@ -1,5 +1,7 @@
-﻿using Grpc.Core;
+﻿using Google.Protobuf.WellKnownTypes;
+using Grpc.Core;
 using Nodegrpcservice;
+using System.Runtime.CompilerServices;
 
 
 namespace NodeProject
@@ -7,7 +9,8 @@ namespace NodeProject
     public class NodeGrpcService : NodeService.NodeServiceBase
     {
        public static readonly Dictionary<int, NodeDetails> _nodes = new Dictionary<int, NodeDetails>();
-
+       public static readonly LeaderAndRoleInfo leaderAndRoleInfo = new LeaderAndRoleInfo();
+       
        
         public async override Task<NodeInfoResponse> BroadcastNodeInfo(NodeInfo request, ServerCallContext context)
         {
@@ -17,7 +20,7 @@ namespace NodeProject
                 NodeInfo = request,
                 LastHeartbeat = DateTime.UtcNow
             };
-
+            
             NodeInfoResponse response = new NodeInfoResponse();
             foreach (var node in _nodes.Values)
             {
@@ -26,6 +29,37 @@ namespace NodeProject
 
             // Return the list of all nodes.
             return response;
+        }
+
+        // Implementing GetLeaderAndRoleInfo
+        public override Task<LeaderAndRoleInfoResponse> GetLeaderAndRoleInfo(Google.Protobuf.WellKnownTypes.Empty request, ServerCallContext context)
+        {
+            // Example implementation - should be replaced with actual logic
+            //response = new LeaderAndRoleInfoResponse { LeaderNodeId = 1, Nodes = new List<NodeInfo>() };
+            return Task.FromResult(new LeaderAndRoleInfoResponse());
+        }
+
+        public override Task<BroadcastResponse> BroadcastLeaderAndRoleInfo(LeaderAndRoleInfo request, ServerCallContext context)
+        {
+            leaderAndRoleInfo.LeaderNodeId = request.LeaderNodeId;
+
+          
+            foreach (var node in request.Nodes)
+            {
+                leaderAndRoleInfo.Nodes.Add(new NodeInfo() { 
+                         NodeId = node.NodeId,
+                         NodeName = node.NodeName,
+                         Role = node.Role
+                });
+            }
+
+            var response = new BroadcastResponse
+            {
+                Success = true,
+                Message = "Leader and role information broadcasted successfully."
+            };
+
+            return Task.FromResult(response);
         }
 
         public override Task<HeartbeatResponse> SendHeartbeat(HeartbeatRequest request, ServerCallContext context)

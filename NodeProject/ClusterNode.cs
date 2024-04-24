@@ -13,5 +13,6 @@ namespace NodeProject
         public string Role { get; set; }
         public string Address { get; set; }
         public int Port {  get; set; }
+        public DateTime CreatedDate { get; set; }
     }
 }

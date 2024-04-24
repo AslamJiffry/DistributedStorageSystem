@@ -46,7 +46,7 @@ namespace NodeProject
             return nodeList;
         }
 
-        public async Task DeregisterNodeAsync(int nodeId)
+        public async void  DeregisterNodeAsync(int nodeId)
         {
             var nodeInfo = new
             {
@@ -62,6 +62,23 @@ namespace NodeProject
             string responseString = await response.Content.ReadAsStringAsync();
 
             Console.WriteLine("Deregister Response: " + responseString);
+        }
+
+        public async Task UpdateNodeRoleAsync(int nodeId, string newRole)
+        {
+            var roleUpdateInfo = new
+            {
+                Id = nodeId,
+                Role = newRole
+            };
+
+            string json = JsonConvert.SerializeObject(roleUpdateInfo);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            HttpResponseMessage response = await client.PostAsync("https://localhost:7078/api/NodeDiscovery/update-role", content);
+            string responseString = await response.Content.ReadAsStringAsync();
+
+            Console.WriteLine("Update Role Response: " + responseString);
         }
     }
 }
